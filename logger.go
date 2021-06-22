@@ -1,7 +1,7 @@
 /**************************************
  * @Author: mazhuang
  * @Date: 2021-06-18 16:32:17
- * @LastEditTime: 2021-06-21 15:31:08
+ * @LastEditTime: 2021-06-22 11:08:35
  * @Description:
  **************************************/
 
@@ -24,92 +24,129 @@ const defaultTime = "2006/01/02 - 15:04:05.000"
 type Logger struct {
 	*zap.Logger
 
-	dir        string
-	prefix     string
-	format     string
-	console    bool
-	showline   bool
-	stackTrace string
-	config     zapcore.EncoderConfig
-	level      zapcore.Level
-	writer     zapcore.WriteSyncer
+	format  string // encoder format
+	console bool
+	config  zapcore.EncoderConfig
+	level   zapcore.Level
+	writer  zapcore.WriteSyncer
 }
 
-// NewLogger ...
-func NewLogger(level, outDir, prefix string) (log *Logger, err error) {
-	log = &Logger{
-		dir:     outDir,
-		prefix:  prefix,
-		console: true,
-		format:  "console",
-		level:   convertLevel(level),
-	}
-	if log.prefix != "" {
-		log.prefix += " "
-	}
-	log.initEncoderConfig()
+// Config ...
+type Config struct {
+	Level      string // the lowest level of log printing , default "info"
+	Dir        string // log output folder
+	Prefix     string // prefix on each line to identify the logger
+	TimeFormat string // the time format of each line in the log
+	MaxAge     int    // max age (days) of each log file, default 7 days
+	Color      bool   // the color of log level
+	ShowLine   bool   // show log call line number
+	Stacktrace string // stack trace log level
+	Encoder    string // log encoding format, divided into "json" and "console", default "console"
+}
 
-	// 使用file-rotatelogs进行日志分割
-	if err = log.getWriteSyncer(); err != nil {
-		fmt.Printf("Get Write Syncer Failed err:%v", err.Error())
+// New ...
+func New(c Config) (log *Logger, err error) {
+	log = &Logger{
+		format:  c.Encoder,
+		console: true,
+		level:   convertLevel(c.Level),
+	}
+	if c.Prefix != "" {
+		c.Prefix += " "
+	}
+	if c.TimeFormat == "" {
+		c.TimeFormat = defaultTime
+	}
+	log.config = initEncoderConfig(c.Prefix + c.TimeFormat)
+	if c.Stacktrace == "" {
+		log.config.StacktraceKey = ""
+	}
+	if !c.Color {
+		// close color
+		log.config.EncodeLevel = zapcore.CapitalLevelEncoder
+	}
+
+	if err = log.setWriter(c.Dir, c.MaxAge); err != nil {
+		fmt.Printf("set writer failed: %v", err.Error())
 		return
 	}
-	log.Logger = zap.New(log.getEncoderCore(), zap.AddStacktrace(zap.ErrorLevel))
+
+	log.Logger = zap.New(log.getEncoderCore(log.config), zap.AddStacktrace(convertLevel(c.Stacktrace)))
+	if c.ShowLine {
+		log.Logger = log.WithOptions(zap.AddCaller())
+	}
 	return
 }
 
-// SetShowline configures the Logger to annotate each message with the filename, line number, and function name of zap's caller.
-func (l *Logger) SetShowline() {
-	l.Logger = l.WithOptions(zap.AddCaller())
+// NewDefault ...
+func NewDefault() (log *Logger, err error) {
+	return New(Config{
+		Color:      true,
+		Dir:        "logs",
+		MaxAge:     30,
+		TimeFormat: defaultTime,
+		Stacktrace: "error",
+		ShowLine:   false,
+		Encoder:    "console",
+	})
+}
+
+// Showline configures the Logger to annotate each message with the filename, line number, and function name of zap's caller.
+func (l *Logger) Showline() *zap.Logger {
+	return l.WithOptions(zap.AddCaller())
 }
 
 // SetStacktraceLevel configures the Logger to record a stack trace for all messages at or above a given level.
-func (l *Logger) SetStacktraceLevel(level string) {
-	l.Logger = l.WithOptions(zap.AddStacktrace(convertLevel(level)))
+func (l *Logger) SetStacktraceLevel(level string) *zap.Logger {
+	return l.WithOptions(zap.AddStacktrace(convertLevel(level)))
 }
 
 // CloseStacktrace ...
-func (l *Logger) CloseStacktrace() {
-	l.config.StacktraceKey = ""
-	l.wrapCore()
+func (l *Logger) CloseStacktrace() *zap.Logger {
+	c := l.config
+	c.StacktraceKey = ""
+	return l.wrapCore(c)
 }
 
 // SetTimeFormat sets the log output format.
 // default time format is `2006/01/02 - 15:04:05.000`,
-func (l *Logger) SetTimeFormat(timeFormat string) {
-	if timeFormat == "" {
-		return
-	}
-	l.config.EncodeTime = customTimeEncoder(l.prefix + timeFormat)
-	l.wrapCore()
+func (l *Logger) SetTimeFormat(timeFormat string) *zap.Logger {
+	c := l.config
+	c.EncodeTime = customTimeEncoder(timeFormat)
+	return l.wrapCore(c)
 }
 
-// CloseColor ...
-func (l *Logger) CloseColor() {
-	l.config.EncodeLevel = zapcore.CapitalLevelEncoder
-	l.wrapCore()
+// NoColor ...
+func (l *Logger) NoColor() *zap.Logger {
+	c := l.config
+	c.EncodeLevel = zapcore.CapitalLevelEncoder
+	return l.wrapCore(c)
 }
 
-// SetJSONStyle ...
-func (l *Logger) SetJSONStyle() {
+// SetJSONStyle change output style to json
+func (l *Logger) SetJSONStyle() *zap.Logger {
+	tmp := l.format
+	defer func() { l.format = tmp }()
 	l.format = "json"
-	l.wrapCore()
+	return l.wrapCore(l.config)
 }
 
 // wrapCore wraps or replaces the Logger's underlying zapcore.Core.
-func (l *Logger) wrapCore() {
-	l.Logger = l.WithOptions(zap.WrapCore(func(c zapcore.Core) zapcore.Core {
-		return l.getEncoderCore()
+func (l *Logger) wrapCore(ec zapcore.EncoderConfig) *zap.Logger {
+	return l.WithOptions(zap.WrapCore(func(c zapcore.Core) zapcore.Core {
+		return l.getEncoderCore(ec)
 	}))
 }
 
-// getWriteSyncer zap logger中加入file-rotatelogs
-func (l *Logger) getWriteSyncer() error {
+// setWriter zap logger's writer use file-rotatelogs
+func (l *Logger) setWriter(dir string, maxAge int) error {
+	if maxAge <= 0 {
+		maxAge = 7
+	}
 	fileWriter, err := rotatelogs.New(
-		path.Join(l.dir, "%Y-%m-%d.log"),
-		rotatelogs.WithMaxAge(7*24*time.Hour),
+		path.Join(dir, "%Y-%m-%d.log"),
+		rotatelogs.WithMaxAge(time.Duration(maxAge)*24*time.Hour),
 		rotatelogs.WithRotationTime(24*time.Hour),
-		// rotatelogs.WithRotationCount(30),
 	)
 	if err != nil {
 		return err
@@ -122,9 +159,20 @@ func (l *Logger) getWriteSyncer() error {
 	return nil
 }
 
+// getEncoderCore uses the new config to get the new core
+func (l *Logger) getEncoderCore(ec zapcore.EncoderConfig) (core zapcore.Core) {
+	var encoder zapcore.Encoder
+	if l.format == "json" {
+		encoder = zapcore.NewJSONEncoder(ec)
+	} else {
+		encoder = zapcore.NewConsoleEncoder(ec)
+	}
+	return zapcore.NewCore(encoder, l.writer, l.level)
+}
+
 // initEncoderConfig init zapcore.EncoderConfig
-func (l *Logger) initEncoderConfig() {
-	l.config = zapcore.EncoderConfig{
+func initEncoderConfig(format string) zapcore.EncoderConfig {
+	return zapcore.EncoderConfig{
 		MessageKey:     "message",
 		LevelKey:       "level",
 		TimeKey:        "time",
@@ -133,21 +181,10 @@ func (l *Logger) initEncoderConfig() {
 		StacktraceKey:  "stacktrace",
 		LineEnding:     zapcore.DefaultLineEnding,
 		EncodeLevel:    zapcore.CapitalColorLevelEncoder,
-		EncodeTime:     customTimeEncoder(l.prefix + defaultTime),
+		EncodeTime:     customTimeEncoder(format),
 		EncodeDuration: zapcore.SecondsDurationEncoder,
 		EncodeCaller:   zapcore.FullCallerEncoder,
 	}
-}
-
-// getEncoderCore uses the new config to get the new core
-func (l *Logger) getEncoderCore() (core zapcore.Core) {
-	var encoder zapcore.Encoder
-	if l.format == "json" {
-		encoder = zapcore.NewJSONEncoder(l.config)
-	} else {
-		encoder = zapcore.NewConsoleEncoder(l.config)
-	}
-	return zapcore.NewCore(encoder, l.writer, l.level)
 }
 
 // customTimeEncoder sets custom log output time format
