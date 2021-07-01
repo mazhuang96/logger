@@ -1,7 +1,7 @@
 /**************************************
  * @Author: mazhuang
  * @Date: 2021-07-01 15:42:21
- * @LastEditTime: 2021-07-01 15:50:05
+ * @LastEditTime: 2021-07-01 15:54:44
  * @Description:
  **************************************/
 
@@ -9,7 +9,10 @@ package logger
 
 import (
 	"bytes"
+	"fmt"
+	"time"
 
+	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -29,4 +32,20 @@ func (l *Writer) Write(p []byte) (int, error) {
 	p = bytes.TrimSpace(p)
 	l.logFunc(string(p))
 	return len(p), nil
+}
+
+// GinFormatter ...
+func GinFormatter(param gin.LogFormatterParams) string {
+	if param.Latency > time.Minute {
+		// Truncate in a golang < 1.8 safe way
+		param.Latency = param.Latency - param.Latency%time.Second
+	}
+	return fmt.Sprintf("%3d| %13v | %15s |%-7s %#v\n%s",
+		param.StatusCode,
+		param.Latency,
+		param.ClientIP,
+		param.Method,
+		param.Path,
+		param.ErrorMessage,
+	)
 }

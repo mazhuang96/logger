@@ -78,3 +78,9 @@ runtime.main
 2021/06/22 - 10:14:13.068       FATAL   But I forgot to bring an umbrella!      {"error": "not found"}
 exit status 1
 ```
+
+## changelog
+
+- v0.1.0: first commit
+- v0.1.1: add logger config
+- v0.1.2: add gin logger
