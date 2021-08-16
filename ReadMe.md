@@ -7,7 +7,7 @@ Simple to use [zap](https://github.com/uber-go/zap) log with [file-rotatelogs](h
 ### install
 
 ```shell
-go get -u github.com/mazhuang96/logger
+go get -u github.com/seek4self/logger
 ```
 
 ## example
@@ -81,6 +81,6 @@ exit status 1
 
 ## changelog
 
-- v0.1.0: first commit
-- v0.1.1: add logger config
 - v0.1.2: add gin logger
+- v0.1.1: add logger config
+- v0.1.0: first commit
