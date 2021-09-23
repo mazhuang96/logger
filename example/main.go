@@ -10,7 +10,7 @@ package main
 import (
 	"errors"
 
-	"github.com/mazhuang96/logger"
+	"github.com/seek4self/logger"
 
 	"go.uber.org/zap"
 )

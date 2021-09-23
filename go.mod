@@ -1,4 +1,4 @@
-module github.com/mazhuang96/logger
+module github.com/seek4self/logger
 
 go 1.15
 
