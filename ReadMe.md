@@ -81,6 +81,7 @@ exit status 1
 
 ## changelog
 
+- v0.1.4: logger add a method of get gin log config
 - v0.1.3: gin force print color log
 - v0.1.2: add gin logger
 - v0.1.1: add logger config

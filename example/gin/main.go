@@ -1,7 +1,7 @@
 /**************************************
  * @Author: mazhuang
  * @Date: 2021-09-23 14:19:42
- * @LastEditTime: 2021-09-23 14:32:02
+ * @LastEditTime: 2021-10-12 11:11:06
  * @Description:
  **************************************/
 
@@ -20,10 +20,7 @@ func main() {
 
 	r := gin.New()
 
-	r.Use(gin.LoggerWithConfig(gin.LoggerConfig{
-		Output:    logger.NewGinLogger(log.Logger),
-		Formatter: logger.GinFormatter,
-	}))
+	r.Use(gin.LoggerWithConfig(log.GinLogConfig()))
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"message": "pong",

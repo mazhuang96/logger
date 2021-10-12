@@ -1,7 +1,7 @@
 /**************************************
  * @Author: mazhuang
  * @Date: 2021-06-18 16:32:17
- * @LastEditTime: 2021-06-22 11:08:35
+ * @LastEditTime: 2021-10-12 10:44:50
  * @Description:
  **************************************/
 
@@ -13,6 +13,7 @@ import (
 	"path"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -83,12 +84,20 @@ func NewDefault() (log *Logger, err error) {
 	return New(Config{
 		Color:      true,
 		Dir:        "logs",
-		MaxAge:     30,
+		MaxAge:     7,
 		TimeFormat: defaultTime,
 		Stacktrace: "error",
 		ShowLine:   false,
 		Encoder:    "console",
 	})
+}
+
+// GinLogConfig return gin web framework log configuration
+func (l *Logger) GinLogConfig() gin.LoggerConfig {
+	return gin.LoggerConfig{
+		Output:    NewGinLogger(l.Logger),
+		Formatter: GinFormatter,
+	}
 }
 
 // Showline configures the Logger to annotate each message with the filename, line number, and function name of zap's caller.
