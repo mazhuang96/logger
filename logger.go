@@ -1,7 +1,7 @@
 /**************************************
  * @Author: mazhuang
  * @Date: 2021-06-18 16:32:17
- * @LastEditTime: 2021-10-12 10:44:50
+ * @LastEditTime: 2022-03-07 14:42:26
  * @Description:
  **************************************/
 
@@ -93,10 +93,11 @@ func NewDefault() (log *Logger, err error) {
 }
 
 // GinLogConfig return gin web framework log configuration
-func (l *Logger) GinLogConfig() gin.LoggerConfig {
+func (l *Logger) GinLogConfig(path ...string) gin.LoggerConfig {
 	return gin.LoggerConfig{
 		Output:    NewGinLogger(l.Logger),
 		Formatter: GinFormatter,
+		SkipPaths: path,
 	}
 }
 
